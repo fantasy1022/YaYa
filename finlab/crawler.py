@@ -34,6 +34,38 @@ def requests_post(*args1, **args2):
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
+
+def crawl_cement(date):
+    datestr = date.strftime('%Y%m%d')
+    try:
+        r = requests_post('https://www.twse.com.tw/exchangeReport/MI_INDEX?response=csv&date=' + datestr + '&type=ALLBUT0999')
+    except Exception as e:
+        print('**WARRN: cannot get stock price at', datestr)
+        print(e)
+        return None
+
+    content = r.text.replace('=', '')
+
+    lines = content.split('\n')
+    lines = list(filter(lambda l:len(l.split('",')) > 10, lines))
+    content = "\n".join(lines)
+
+    if content == '':
+        return None
+
+    df = pd.read_csv(StringIO(content))
+    df = df.astype(str)
+    df = df.apply(lambda s: s.str.replace(',', ''))
+    df['date'] = pd.to_datetime(date)
+    df = df.rename(columns={'指數':'stock_id'})
+    df = df.set_index(['stock_id', 'date'])
+
+    df = df.apply(lambda s:pd.to_numeric(s, errors='coerce'))
+    df = df[df.columns[df.isnull().all() == False]]
+    # df = df[~df['收盤指數'].isnull()]
+
+    return df
+
 def crawl_price(date):
     datestr = date.strftime('%Y%m%d')
     
